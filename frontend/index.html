@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Search with TF-IDF</title>
+    <!-- Tambahkan Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tambahkan FontAwesome untuk ikon PDF -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styling untuk progress bar */
+        progress {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        progress::-webkit-progress-bar {
+            background-color: #e5e7eb;
+        }
+        progress::-webkit-progress-value {
+            background-color: #3b82f6;
+        }
+        progress::-moz-progress-bar {
+            background-color: #3b82f6;
+        }
+        .result-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .result-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #34d399, #10b981);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(to right, #10b981, #34d399);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+    <h1 class="text-4xl font-bold text-gray-800 mb-8">Resume Search with TF-IDF</h1>
+
+    <!-- Search Box -->
+    <div class="w-full max-w-lg bg-white p-6 rounded-xl shadow-lg mb-10">
+        <form id="search-form" class="flex flex-col gap-4">
+            <input type="text" id="query" placeholder="Masukkan deskripsi pekerjaan..." required class="w-full p-3 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+            <button type="submit" class="btn-primary text-white font-semibold py-3 rounded-lg transition-colors">Cari</button>
+        </form>
+    </div>
+
+    <!-- Results Section -->
+    <div class="results w-full max-w-2xl flex flex-col gap-6" id="results" style="display: none;">
+        <h2 class="text-2xl font-semibold text-gray-700">Hasil Pencarian</h2>
+        <div id="result-body" class="flex flex-col gap-6">
+            <!-- Hasil ditampilkan di sini -->
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('search-form');
+        const resultDiv = document.getElementById('results');
+        const resultBody = document.getElementById('result-body');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = document.getElementById('query').value;
+
+            const response = await fetch('http://localhost:8000/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+            resultBody.innerHTML = '';
+
+            if (data && data.length > 0) {
+                resultDiv.style.display = 'block';
+                data.forEach(item => {
+                    const similarityPercentage = (item.tfidf_similarity * 100).toFixed(2);
+                    resultBody.innerHTML += `
+                        <div class="result-card bg-white p-6 rounded-xl shadow-md flex flex-col gap-4">
+                            <div class="flex items-center gap-2">
+                                <progress value="${similarityPercentage}" max="100"></progress>
+                                <span class="text-gray-600 text-sm">${similarityPercentage}%</span>
+                            </div>
+                            <div class="text-gray-600">
+                                <p><span class="font-medium">PDF Summary:</span> ${item.pdf_summary}</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <a href="/static/data/data/${item.Category}/${item.ID}.pdf" target="_blank" class="text-red-500">
+                                    <i class="fa-solid fa-file-pdf text-2xl"></i>
+                                </a>
+                                <a href="/static/data/data/${item.Category}/${item.ID}.pdf" target="_blank" class="text-gray-800 font-medium hover:underline">${item.Category}_${item.ID}.pdf</a>
+                            </div>
+                           
+                        </div>
+                    `;
+                });
+            } else {
+                resultBody.innerHTML = '<div class="text-center text-gray-500">Tidak ditemukan hasil.</div>';
+            }
+        });
+    </script>
+</body>
+</html>
