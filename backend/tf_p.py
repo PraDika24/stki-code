@@ -1,21 +1,22 @@
 import pandas as pd
 import string
 import nltk
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 import os
 import pdfplumber
 
-# Inisialisasi dan Load File
+# Inisialisasi
 nltk.download('stopwords')
 stemmer = PorterStemmer()
 
+# Load dataset
 file_path = 'archive/Resume/Resume.csv'
 df = pd.read_csv(file_path)
 
-# preprocessing data dari csv
+# Preprocessing
 def preprocess(text):
     if pd.isnull(text):
         return ""
@@ -27,9 +28,9 @@ def preprocess(text):
     stemmed = [stemmer.stem(word) for word in filtered]
     return ' '.join(stemmed)
 
-df['processed_cv'] = df['Resume_str'].apply(preprocess)
+df['processed_cv'] = df['Resume_str'].astype(str).apply(preprocess)
 
-# Ektrasi summary pada file pdf
+# Ekstraksi ringkasan dari PDF
 def extract_pdf_summary(pdf_path):
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -40,22 +41,30 @@ def extract_pdf_summary(pdf_path):
     except Exception:
         return "Cannot extract PDF summary"
 
-# Mencari summary resume kesamaan dengan query
-def get_similar_resumes(job_description_input):
+# Fungsi utama: mencari kemiripan dengan TF-P
+def get_similar_resumes_tfp(job_description_input):
     job_description = preprocess(job_description_input)
     documents = [job_description] + df['processed_cv'].tolist()
 
-    tfidf_vectorizer = TfidfVectorizer()
-    tfidf_matrix = tfidf_vectorizer.fit_transform(documents)
+    vectorizer = CountVectorizer()
+    vector_matrix = vectorizer.fit_transform(documents).toarray()
 
-    tfidf_sim = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])[0]
-    df['tfidf_similarity'] = tfidf_sim
+    jd_vector = vector_matrix[0]
+    resume_vectors = vector_matrix[1:]
 
-    df_sorted = df.sort_values(by='tfidf_similarity', ascending=False)
+    # Hitung TF-P
+    jd_tfp = jd_vector / (jd_vector.sum() + 1e-9)
+    resume_tfp = resume_vectors / (resume_vectors.sum(axis=1, keepdims=True) + 1e-9)
 
-    # Pastikan ID dan Category diambil dari kolom asli
+    similarity_scores = cosine_similarity(resume_tfp, [jd_tfp]).flatten()
+    df['tfp_similarity'] = similarity_scores
+
+    df_sorted = df.sort_values(by='tfp_similarity', ascending=False)
+
+    # Path ke PDF resume
     base_dir = os.path.dirname(os.path.abspath(__file__))
     archive_path = os.path.join(base_dir, "..", "archive", "data", "data")
+
     results = df_sorted.head(10).copy()
     results['csv_summary'] = results['Resume_str'].apply(lambda x: x[:300] + "..." if x else "No summary available")
     results['pdf_summary'] = results.apply(
@@ -63,4 +72,4 @@ def get_similar_resumes(job_description_input):
         axis=1
     )
 
-    return results[['ID', 'Category', 'tfidf_similarity', 'csv_summary', 'pdf_summary']].to_dict(orient='records')
+    return results[['ID', 'Category', 'tfp_similarity', 'csv_summary', 'pdf_summary']].to_dict(orient='records')
