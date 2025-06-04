@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Search with Grok 3</title>
+    <title>Resume Search with Tf-IDF and TF-P</title>
     <!-- Tambahkan Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tambahkan FontAwesome untuk ikon -->
@@ -96,55 +96,60 @@
         </div>
     </div>
 
-    <script>
-        const form = document.getElementById('search-form');
-        const resultDiv = document.getElementById('results');
-        const resultBody = document.getElementById('result-body');
-        const toggleButtons = document.querySelectorAll('.toggle-btn');
+  <script>
+    const form = document.getElementById('search-form');
+    const resultDiv = document.getElementById('results');
+    const resultBody = document.getElementById('result-body');
+    const toggleButtons = document.querySelectorAll('.toggle-btn');
 
-        // Logika toggle untuk tombol metode
-        toggleButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                toggleButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-            });
+    // Logika toggle untuk tombol metode
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            toggleButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+        });
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = document.getElementById('query').value;
+        const method = document.querySelector('.toggle-btn.active').getAttribute('data-method');
+
+        const response = await fetch('http://localhost:8000/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, method })
         });
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const query = document.getElementById('query').value;
-            const method = document.querySelector('.toggle-btn.active').getAttribute('data-method');
+        const data = await response.json();
+        resultBody.innerHTML = '';
 
-            const response = await fetch('http://localhost:8000/api/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, method })
-            });
-
-            const data = await response.json();
-            resultBody.innerHTML = '';
-
-            if (data && data.length > 0) {
-                resultDiv.style.display = 'block';
-                data.forEach(item => {
-                    resultBody.innerHTML += `
-                        <div class="result-card bg-white p-6 rounded-xl shadow-md flex flex-col gap-4 text-gray-800">
+        if (data && data.length > 0) {
+            resultDiv.style.display = 'block';
+            data.forEach(item => {
+                // Menampilkan skor kemiripan berdasarkan metode yang dipilih
+                const similarityScore = (method === 'tf_p' ? item.tfp_similarity : item.tfidf_similarity).toFixed(4);
+                resultBody.innerHTML += `
+                    <div class="result-card bg-white p-6 rounded-xl shadow-md flex flex-col gap-4 text-gray-800">
+                        <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
                                 <a href="/static/data/data/${item.Category}/${item.ID}.pdf" target="_blank" class="text-red-500">
                                     <i class="fa-solid fa-file-pdf text-2xl"></i>
                                 </a>
                                 <a href="/static/data/data/${item.Category}/${item.ID}.pdf" target="_blank" class="text-gray-800 font-medium hover:underline">${item.Category}_${item.ID}.pdf</a>
                             </div>
-                            <div class="text-gray-600">
-                                <p><span class="font-medium">PDF Summary:</span> ${item.pdf_summary}</p>
-                            </div>
+                            <p class="text-gray-600 font-medium">Similarity Score: ${similarityScore}</p>
                         </div>
-                    `;
-                });
-            } else {
-                resultBody.innerHTML = '<div class="text-center text-gray-500">Tidak ditemukan hasil.</div>';
-            }
-        });
-    </script>
+                        <div class="text-gray-600">
+                            <p><span class="font-medium">PDF Summary:</span> ${item.pdf_summary}</p>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            resultBody.innerHTML = '<div class="text-center text-gray-500">Tidak ditemukan hasil.</div>';
+        }
+    });
+</script>
 </body>
 </html>
